@@ -196,7 +196,7 @@ API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta 
 
 ```bash
 # 1. Clonar el repositorio
-git clone <url-del-repositorio>
+git clone https://github.com/Juliodvp29/habit_manager_api.git
 cd habit_manager_api
 
 # 2. Instalar dependencias
