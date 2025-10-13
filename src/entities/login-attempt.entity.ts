@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -7,8 +8,8 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 
-@Entity('notifications')
-export class Notification {
+@Entity('login_attempts')
+export class LoginAttempt {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -16,18 +17,18 @@ export class Notification {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'varchar', length: 150, nullable: true })
-  title: string;
+  @Column({ type: 'varchar', length: 45, nullable: true })
+  ipAddress: string;
 
   @Column({ type: 'text', nullable: true })
-  message: string;
-
-  @Column({ type: 'timestamp', nullable: true })
-  scheduledAt: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
-  sentAt: Date;
+  userAgent: string;
 
   @Column({ type: 'boolean', default: false })
-  isRead: boolean;
+  success: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  requires2fa: boolean;
+
+  @CreateDateColumn()
+  attemptedAt: Date;
 }

@@ -43,7 +43,13 @@ export class UsersService {
     }
 
     if (updateProfileDto.preferredLanguageId) {
-      user.preferredLanguage = { id: updateProfileDto.preferredLanguageId } as any;
+      user.preferredLanguage = {
+        id: updateProfileDto.preferredLanguageId,
+      } as any;
+    }
+
+    if (updateProfileDto.profilePicture !== undefined) {
+      user.profilePicture = updateProfileDto.profilePicture;
     }
 
     await this.userRepository.save(user);

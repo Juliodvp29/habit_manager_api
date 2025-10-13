@@ -89,7 +89,7 @@ export class HabitsService {
       });
     } else {
       log.progress = logHabitDto.progress;
-      log.notes = logHabitDto.notes ?? null;
+      log.notes = logHabitDto.notes || null;
       log.completed = logHabitDto.progress >= habit.targetCount;
     }
 

@@ -8,6 +8,7 @@ import { User } from '../entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { VerificationModule } from 'src/verification/verification.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
       inject: [ConfigService],
     }),
+    VerificationModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

@@ -7,7 +7,10 @@ import { AuthModule } from './auth/auth.module';
 import { HabitsModule } from './habits/habits.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
-
+import { VerificationModule } from './verification/verification.module';
+import { EmailModule } from './email/email.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AiModule } from './ai/ai.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,7 +27,7 @@ import { UsersModule } from './users/users.module';
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_DATABASE'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: false, //Usar migraciones en producción
+        synchronize: false, // ⚠️ Usar migraciones en producción
         logging: configService.get('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],
@@ -33,6 +36,10 @@ import { UsersModule } from './users/users.module';
     HabitsModule,
     SyncModule,
     UsersModule,
+    AiModule,
+    NotificationsModule,
+    EmailModule,
+    VerificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

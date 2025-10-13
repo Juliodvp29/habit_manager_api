@@ -13,7 +13,6 @@ import { Habit } from './habit.entity';
 import { Language } from './language.entity';
 import { UserSettings } from './user-settings.entity';
 
-
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
@@ -27,6 +26,9 @@ export class User {
 
   @Column({ type: 'varchar', length: 150, nullable: true })
   fullName: string;
+
+  @Column({ type: 'text', nullable: true })
+  profilePicture: string;
 
   @ManyToOne(() => Language, { nullable: true })
   @JoinColumn({ name: 'preferred_language_id' })
