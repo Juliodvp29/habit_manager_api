@@ -29,22 +29,22 @@ export class Habit {
   @Column({ type: 'varchar', length: 50, default: 'daily' })
   frequency: string;
 
-  @Column({ type: 'int', default: 1 })
+  @Column({ type: 'int', default: 1, name: 'target_count' })
   targetCount: number;
 
-  @Column({ type: 'date', default: () => 'CURRENT_DATE' })
+  @Column({ type: 'date', default: () => 'CURRENT_DATE', name: 'start_date' })
   startDate: Date;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, name: 'last_synced_at' })
   lastSyncedAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
   @OneToMany(() => HabitLog, (log) => log.habit)

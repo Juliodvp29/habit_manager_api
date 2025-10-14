@@ -19,15 +19,15 @@ export class UserSettings {
   @Column({ type: 'varchar', length: 20, default: 'light' })
   theme: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: true, name: 'notification_enabled' })
   notificationEnabled: boolean;
 
-  @Column({ type: 'time', default: '08:00' })
+  @Column({ type: 'time', default: '08:00', name: 'reminder_time' })
   reminderTime: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: true, name: 'weekly_summary' })
   weeklySummary: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, name: 'last_sync_at' })
   lastSyncAt: Date;
 }

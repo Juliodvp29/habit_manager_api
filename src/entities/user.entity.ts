@@ -21,32 +21,40 @@ export class User {
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  // ⬇️ AGREGAR name: 'password_hash'
+  @Column({ type: 'varchar', length: 255, name: 'password_hash' })
   passwordHash: string;
 
-  @Column({ type: 'varchar', length: 150, nullable: true })
+  // ⬇️ AGREGAR name: 'full_name'
+  @Column({ type: 'varchar', length: 150, nullable: true, name: 'full_name' })
   fullName: string;
 
-  @Column({ type: 'text', nullable: true })
+  // ⬇️ AGREGAR name: 'profile_picture'
+  @Column({ type: 'text', nullable: true, name: 'profile_picture' })
   profilePicture: string;
 
   @ManyToOne(() => Language, { nullable: true })
   @JoinColumn({ name: 'preferred_language_id' })
   preferredLanguage: Language;
 
-  @Column({ type: 'boolean', default: false })
+  // ⬇️ AGREGAR name: 'is_email_verified'
+  @Column({ type: 'boolean', default: false, name: 'is_email_verified' })
   isEmailVerified: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  // ⬇️ AGREGAR name: 'email_verified_at'
+  @Column({ type: 'timestamp', nullable: true, name: 'email_verified_at' })
   emailVerifiedAt: Date;
 
-  @Column({ type: 'boolean', default: true })
+  // ⬇️ AGREGAR name: 'is_active'
+  @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
-  @CreateDateColumn()
+  // ⬇️ AGREGAR name: 'created_at'
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  // ⬇️ AGREGAR name: 'updated_at'
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
   @OneToMany(() => Habit, (habit) => habit.user)

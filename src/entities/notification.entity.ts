@@ -22,12 +22,12 @@ export class Notification {
   @Column({ type: 'text', nullable: true })
   message: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, name: 'scheduled_at' })
   scheduledAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, name: 'sent_at' })
   sentAt: Date;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false, name: 'is_read' })
   isRead: boolean;
 }

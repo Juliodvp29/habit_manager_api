@@ -28,6 +28,6 @@ export class AiRecommendation {
   @Column({ type: 'varchar', length: 50, nullable: true })
   category: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

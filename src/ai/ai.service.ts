@@ -538,6 +538,8 @@ Responde SOLO con el mensaje motivacional, sin explicaciones.`;
         },
       ];
 
+      console.log('Calling OpenAI with prompt:', prompt); // Debug log
+
       const response = await fetch(this.openaiApiUrl, {
         method: 'POST',
         headers: {
@@ -552,12 +554,17 @@ Responde SOLO con el mensaje motivacional, sin explicaciones.`;
         }),
       });
 
+      console.log('OpenAI response status:', response.status); // Debug log
+
       if (!response.ok) {
         console.error(`OpenAI API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('OpenAI error response:', errorText);
         return this.generateFallbackMessage();
       }
 
       const data: OpenAIResponse = await response.json();
+      console.log('OpenAI response data:', data); // Debug log
       return data.choices[0].message.content.trim();
     } catch (error) {
       console.error('Error calling OpenAI:', error);

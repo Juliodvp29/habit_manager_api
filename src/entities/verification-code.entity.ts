@@ -28,12 +28,12 @@ export class VerificationCode {
   @Column({ type: 'int', default: 0 })
   attempts: number;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false, name: 'is_used' })
   isUsed: boolean;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp', name: 'expires_at' })
   expiresAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

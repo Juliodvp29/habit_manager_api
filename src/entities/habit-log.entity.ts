@@ -19,7 +19,7 @@ export class HabitLog {
   @JoinColumn({ name: 'habit_id' })
   habit: Habit;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', name: 'log_date' })
   logDate: Date;
 
   @Column({ type: 'int', default: 0 })
@@ -31,9 +31,9 @@ export class HabitLog {
   @Column({ type: 'boolean', default: false })
   completed: boolean;
 
-  @Column({ type: 'varchar', length: 20, default: 'synced' })
+  @Column({ type: 'varchar', length: 20, default: 'synced', name: 'sync_status' })
   syncStatus: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
