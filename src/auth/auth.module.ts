@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VerificationModule } from 'src/verification/verification.module';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 import { LoginAttempt } from '../entities/login-attempt.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { UserSettings } from '../entities/user-settings.entity';
@@ -32,6 +33,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
     }),
     VerificationModule,
+    NotificationsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

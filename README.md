@@ -172,9 +172,18 @@ API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta 
 - ✅ Historial de recomendaciones
 
 ### 🔔 Notificaciones (RF-05)
-- ✅ Sistema base de notificaciones
+- ✅ Sistema completo de notificaciones inteligentes
+- ✅ Creación automática de notificaciones programadas
+- ✅ Recordatorios diarios personalizados (configurable por hora)
+- ✅ Mensajes motivacionales diarios aleatorios
+- ✅ Notificaciones de rachas y logros (3, 7, 30 días)
+- ✅ Alertas de seguridad por intentos fallidos de login
+- ✅ Resúmenes semanales de progreso
+- ✅ Notificaciones de login desde nueva ubicación
 - ✅ Marcado de notificaciones como leídas
-- ⚠️ **Pendiente:** Integración con Firebase Cloud Messaging (FCM)
+- ✅ Limpieza automática de notificaciones antiguas
+- ✅ Respeta configuraciones de usuario (notificationEnabled)
+- ⚠️ **Pendiente:** Integración con Firebase Cloud Messaging (FCM) para push notifications
 
 ### 🔄 Sincronización Offline (RF-09)
 - ✅ Sincronización bidireccional de hábitos y logs
@@ -995,6 +1004,36 @@ GET /notifications?unreadOnly=true
 Authorization: Bearer {token}
 ```
 
+**Respuesta (200):**
+```json
+[
+  {
+    "id": 1,
+    "title": "¡Hora de tus hábitos!",
+    "message": "Tienes 3 hábito(s) pendiente(s) hoy. ¡No olvides completarlos!",
+    "scheduledAt": "2025-01-15T08:00:00Z",
+    "sentAt": "2025-01-15T08:00:00Z",
+    "isRead": false
+  },
+  {
+    "id": 2,
+    "title": "Mensaje motivacional del día",
+    "message": "¡Recuerda que cada pequeño paso cuenta! Sigue adelante.",
+    "scheduledAt": "2025-01-15T09:00:00Z",
+    "sentAt": "2025-01-15T09:00:00Z",
+    "isRead": false
+  },
+  {
+    "id": 3,
+    "title": "¡Nueva racha!",
+    "message": "¡Felicitaciones! Has completado \"Meditar\" por 3 días consecutivos.",
+    "scheduledAt": "2025-01-15T22:00:00Z",
+    "sentAt": "2025-01-15T22:00:00Z",
+    "isRead": false
+  }
+]
+```
+
 ---
 
 #### Marcar como Leída
@@ -1003,12 +1042,31 @@ PATCH /notifications/:id/read
 Authorization: Bearer {token}
 ```
 
+**Respuesta (200):**
+```json
+{
+  "id": 1,
+  "title": "¡Hora de tus hábitos!",
+  "message": "Tienes 3 hábito(s) pendiente(s) hoy. ¡No olvides completarlos!",
+  "isRead": true,
+  "readAt": "2025-01-15T10:30:00Z"
+}
+```
+
 ---
 
 #### Marcar Todas como Leídas
 ```http
 PATCH /notifications/read-all
 Authorization: Bearer {token}
+```
+
+**Respuesta (200):**
+```json
+{
+  "message": "Todas las notificaciones marcadas como leídas",
+  "markedCount": 5
+}
 ```
 
 ---
@@ -1047,8 +1105,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ## ⏳ Funcionalidades Pendientes
 
 ### Alta Prioridad
-- ⚠️ **Firebase Cloud Messaging (FCM)** - Notificaciones push reales
-- ⚠️ **Cron Jobs** - Envío automático de notificaciones y limpieza de códigos expirados
+- ⚠️ **Firebase Cloud Messaging (FCM)** - Notificaciones push reales para app móvil
+- ✅ **Cron Jobs** - Sistema completo de tareas programadas para notificaciones automáticas
 - ⚠️ **Rate Limiting** - Limitar peticiones por IP/usuario
 - ⚠️ **Paginación** - Implementar en listados grandes
 
@@ -1172,7 +1230,7 @@ Los procesos de verificación 2FA incluyen logs detallados para debugging:
 - `ai_recommendations` - Recomendaciones generadas
 - `verification_codes` - Códigos de verificación (email, 2FA, reset)
 - `login_attempts` - Auditoría de logins
-- `notifications` - Notificaciones del sistema
+- `notifications` - Notificaciones inteligentes automáticas
 - `languages` - Idiomas disponibles
 - `refresh_tokens` - Tokens de refresco JWT
 
@@ -1215,7 +1273,13 @@ Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
 
 5. **Análisis IA**: Requiere al menos 7 días de logs para generar análisis significativo.
 
-6. **Restricción unique_active_code**: Solucionada eliminando códigos usados antiguos antes de marcar nuevos como usados, evitando conflictos de unicidad en la base de datos.
+6. **Notificaciones Automáticas**: Se ejecutan según horarios programados y respetan la configuración `notificationEnabled` del usuario.
+
+7. **Recordatorios Personalizados**: Los recordatorios diarios se envían a la hora configurada en `reminderTime` (por defecto 08:00).
+
+8. **Notificaciones de Seguridad**: Se activan automáticamente ante intentos fallidos de login o accesos desde nuevas ubicaciones.
+
+9. **Restricción unique_active_code**: Solucionada eliminando códigos usados antiguos antes de marcar nuevos como usados, evitando conflictos de unicidad en la base de datos.
 
 ---
 

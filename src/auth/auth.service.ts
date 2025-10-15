@@ -14,6 +14,7 @@ import { LoginAttempt } from '../entities/login-attempt.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';
 import { UserSettings } from '../entities/user-settings.entity';
 import { User } from '../entities/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { VerificationService } from '../verification/verification.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -33,6 +34,7 @@ export class AuthService {
     private jwtService: JwtService,
     private verificationService: VerificationService,
     private configService: ConfigService,
+    private notificationsService: NotificationsService,
   ) { }
 
   // ========================================
@@ -388,6 +390,24 @@ export class AuthService {
       ipAddress,
       userAgent,
     );
+
+    // Notificar login desde nueva ubicación si aplica
+    if (ipAddress && user.settings?.notificationEnabled) {
+      const recentLogins = await this.loginAttemptRepository.find({
+        where: { user: { id: user.id }, success: true },
+        order: { attemptedAt: 'DESC' },
+        take: 5,
+      });
+
+      const knownIps = recentLogins.map(login => login.ipAddress);
+      if (!knownIps.includes(ipAddress)) {
+        await this.notificationsService.createNotification(
+          user.id,
+          '🔔 Nuevo inicio de sesión',
+          `Se ha detectado un inicio de sesión desde una nueva ubicación (${ipAddress}). Si no fuiste tú, cambia tu contraseña inmediatamente.`,
+        );
+      }
+    }
 
     return {
       user: this.sanitizeUser(user),
