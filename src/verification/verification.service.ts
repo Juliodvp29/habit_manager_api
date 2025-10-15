@@ -148,15 +148,14 @@ export class VerificationService {
     // Verificar código
     if (verification.code !== code) {
       verification.attempts += 1;
-      await this.verificationCodeRepository.save(verification);
+      await this.verificationCodeRepository.update(verification.id, { attempts: verification.attempts });
       throw new BadRequestException(
         `Código incorrecto. Intentos restantes: ${this.maxAttempts - verification.attempts}`,
       );
     }
 
     // Marcar código como usado
-    verification.isUsed = true;
-    await this.verificationCodeRepository.save(verification);
+    await this.verificationCodeRepository.update(verification.id, { isUsed: true });
 
     // Actualizar usuario
     user.isEmailVerified = true;
@@ -207,6 +206,8 @@ export class VerificationService {
 
   // Verificar código 2FA
   async verify2FACode(userId: number, code: string): Promise<boolean> {
+    console.log(`🔍 Verificando 2FA para usuario ${userId}, código recibido: "${code}"`);
+
     const verification = await this.verificationCodeRepository.findOne({
       where: {
         user: { id: userId },
@@ -216,25 +217,42 @@ export class VerificationService {
     });
 
     if (!verification) {
+      console.log(`❌ No se encontró código 2FA activo para usuario ${userId}`);
       throw new BadRequestException('Código inválido');
     }
 
+    console.log(`📋 Código almacenado: "${verification.code}"`);
+    console.log(`⏰ Código expirará en: ${verification.expiresAt}`);
+    console.log(`📊 Intentos actuales: ${verification.attempts}/${this.maxAttempts}`);
+
     if (new Date() > verification.expiresAt) {
+      console.log(`⏰ Código expirado para usuario ${userId}`);
       throw new BadRequestException('El código ha expirado');
     }
 
     if (verification.attempts >= this.maxAttempts) {
+      console.log(`🚫 Demasiados intentos para usuario ${userId}`);
       throw new BadRequestException('Demasiados intentos');
     }
 
     if (verification.code !== code) {
+      console.log(`❌ Código incorrecto. Esperado: "${verification.code}", Recibido: "${code}"`);
       verification.attempts += 1;
-      await this.verificationCodeRepository.save(verification);
+      await this.verificationCodeRepository.update(verification.id, { attempts: verification.attempts });
       throw new BadRequestException('Código incorrecto');
     }
 
-    verification.isUsed = true;
-    await this.verificationCodeRepository.save(verification);
+    console.log(`✅ Código 2FA correcto para usuario ${userId}`);
+
+    // 🔧 SOLUCIÓN: Eliminar códigos usados antiguos antes de marcar el nuevo como usado
+    await this.verificationCodeRepository.delete({
+      user: { id: userId },
+      type: '2fa_login',
+      isUsed: true,
+    });
+
+    // Ahora marcar el código actual como usado
+    await this.verificationCodeRepository.update(verification.id, { isUsed: true });
 
     return true;
   }
@@ -298,13 +316,12 @@ export class VerificationService {
 
     if (verification.code !== code) {
       verification.attempts += 1;
-      await this.verificationCodeRepository.save(verification);
+      await this.verificationCodeRepository.update(verification.id, { attempts: verification.attempts });
       throw new BadRequestException('Código incorrecto');
     }
 
     // Marcar código como usado
-    verification.isUsed = true;
-    await this.verificationCodeRepository.save(verification);
+    await this.verificationCodeRepository.update(verification.id, { isUsed: true });
 
     // Actualizar contraseña
     const passwordHash = await bcrypt.hash(newPassword, 10);

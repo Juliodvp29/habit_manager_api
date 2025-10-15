@@ -21,6 +21,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    // ⚠️ IMPORTANTE: Rechazar refresh tokens en rutas protegidas
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException(
+        'Use /auth/refresh endpoint to get a new access token',
+      );
+    }
+
+    // Asegurarse que sea un access token o un token antiguo (por compatibilidad)
+    if (payload.type && payload.type !== 'access') {
+      throw new UnauthorizedException('Token inválido');
+    }
+
     const user = await this.userRepository.findOne({
       where: { id: payload.sub, isActive: true },
       relations: ['preferredLanguage'],

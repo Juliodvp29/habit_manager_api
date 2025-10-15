@@ -36,6 +36,8 @@ export class EmailService {
   }
 
   async send2FACode(email: string, code: string, userName?: string) {
+    console.log(`📧 Enviando código 2FA a ${email}: "${code}"`);
+
     const mailOptions = {
       from: this.configService.get('MAIL_FROM'),
       to: email,
@@ -44,10 +46,11 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      return { success: true };
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Código 2FA enviado exitosamente a ${email}`);
+      return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('Error sending 2FA email:', error);
+      console.error('❌ Error sending 2FA email:', error);
       throw new Error('No se pudo enviar el código de autenticación');
     }
   }

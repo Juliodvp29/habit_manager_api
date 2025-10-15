@@ -100,10 +100,10 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 # 📚 Habit Manager API - Documentación
 
-**Versión:** 1.0.0  
-**Framework:** NestJS + TypeScript  
-**Base de Datos:** PostgreSQL  
-**Arquitectura:** REST API con autenticación JWT  
+**Versión:** 0.0.1
+**Framework:** NestJS v11 + TypeScript
+**Base de Datos:** PostgreSQL
+**Arquitectura:** REST API con autenticación JWT
 
 ---
 
@@ -126,12 +126,16 @@ API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta 
 
 ### Tecnologías Principales
 - **NestJS** v11 - Framework de Node.js
-- **TypeORM** - ORM para PostgreSQL
+- **TypeORM** v0.3.27 - ORM para PostgreSQL
 - **PostgreSQL** - Base de datos relacional
 - **JWT** - Autenticación basada en tokens
-- **bcrypt** - Hash de contraseñas
-- **Nodemailer** - Envío de correos electrónicos
-- **OpenAI API** - Análisis y recomendaciones con IA
+- **bcrypt** v6.0.0 - Hash de contraseñas
+- **Nodemailer** v7.0.9 - Envío de correos electrónicos
+- **OpenAI API** - Análisis y recomendaciones con IA (opcional)
+- **Passport** - Autenticación con estrategias
+- **Helmet** - Seguridad HTTP headers
+- **Morgan** - Logging HTTP
+- **CORS** - Configuración de CORS
 
 ---
 
@@ -146,6 +150,8 @@ API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta 
 - ✅ Reenvío de códigos de verificación
 - ✅ Registro de intentos de login (IP y User-Agent)
 - ✅ Protección de rutas con Guards JWT
+- ✅ **Solución implementada para restricción unique_active_code** - Evita conflictos en verificación de códigos
+- ✅ **Logging detallado** para debugging de procesos de verificación
 
 ### 📝 Gestión de Hábitos (RF-02, RF-03)
 - ✅ CRUD completo de hábitos
@@ -190,7 +196,7 @@ API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta 
 ### Requisitos Previos
 - Node.js >= 18.x
 - PostgreSQL >= 14.x
-- npm o yarn
+- npm >= 8.x
 
 ### Pasos de Instalación
 
@@ -206,8 +212,8 @@ npm install
 cp .env.example .env
 # Editar .env con tus credenciales
 
-# 4. Ejecutar migraciones de base de datos
-# (Ejecutar el script SQL habit_ai_v2.sql en PostgreSQL)
+# 4. Configurar base de datos
+# Ejecutar el script SQL habit_ai_v2.sql en PostgreSQL para crear las tablas
 
 # 5. Iniciar el servidor en desarrollo
 npm run start:dev
@@ -346,6 +352,52 @@ POST /auth/verify-2fa
 
 ---
 
+#### Logout
+```http
+POST /auth/logout
+Authorization: Bearer {token}
+```
+
+**Body:**
+```json
+{
+  "refreshToken": "string"
+}
+```
+
+**Respuesta (200):**
+```json
+{
+  "message": "Logout exitoso"
+}
+```
+
+---
+
+#### Refresh Token
+```http
+POST /auth/refresh
+```
+
+**Body:**
+```json
+{
+  "refreshToken": "string",
+  "userId": 1
+}
+```
+
+**Respuesta (200):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "Token renovado exitosamente"
+}
+```
+
+---
+
 #### Obtener Perfil
 ```http
 GET /auth/profile
@@ -404,6 +456,38 @@ POST /verification/resend-code
 ```json
 {
   "email": "usuario@ejemplo.com"
+}
+```
+
+---
+
+#### Enviar Código de Verificación de Email
+```http
+POST /verification/send-email-code
+Authorization: Bearer {token}
+```
+
+**Respuesta (200):**
+```json
+{
+  "message": "Código de verificación enviado a tu email",
+  "emailSent": true
+}
+```
+
+---
+
+#### Enviar Código 2FA
+```http
+POST /verification/send-2fa-code
+Authorization: Bearer {token}
+```
+
+**Respuesta (200):**
+```json
+{
+  "message": "Código 2FA enviado a tu email",
+  "emailSent": true
 }
 ```
 
@@ -996,6 +1080,7 @@ src/
 │   ├── auth.service.ts    # Login, registro, 2FA
 │   ├── dto/               # DTOs de autenticación
 │   ├── guards/            # JWT Auth Guard
+│   ├── service/           # Servicios auxiliares (token cleanup)
 │   └── strategies/        # JWT Strategy
 ├── email/                 # Servicio de emails
 │   ├── email.service.ts   # Nodemailer + templates HTML
@@ -1011,7 +1096,7 @@ src/
 ├── habits/                # Gestión de hábitos
 │   ├── habits.controller.ts
 │   ├── habits.service.ts
-│   ├── dto/
+│   ├── dto/               # DTOs para hábitos
 │   └── habits.module.ts
 ├── notifications/         # Notificaciones
 │   ├── notifications.controller.ts
@@ -1020,14 +1105,17 @@ src/
 ├── sync/                  # Sincronización offline
 │   ├── sync.controller.ts
 │   ├── sync.service.ts
+│   ├── dto/               # DTOs de sincronización
 │   └── sync.module.ts
 ├── users/                 # Gestión de usuarios
 │   ├── users.controller.ts
 │   ├── users.service.ts
+│   ├── dto/               # DTOs de usuarios
 │   └── users.module.ts
 ├── verification/          # Verificación de códigos
 │   ├── verification.controller.ts
 │   ├── verification.service.ts
+│   ├── dto/               # DTOs de verificación
 │   └── verification.module.ts
 ├── app.module.ts          # Módulo raíz
 └── main.ts                # Punto de entrada
@@ -1064,6 +1152,14 @@ npm run start:debug
 
 La aplicación usa **morgan** para logging HTTP en desarrollo y TypeORM logging para queries SQL.
 
+### Logs de Verificación 2FA
+Los procesos de verificación 2FA incluyen logs detallados para debugging:
+- ✅ Código recibido vs almacenado
+- ✅ Fecha de expiración
+- ✅ Número de intentos actuales
+- ✅ Estado de verificación exitosa/fallida
+- ✅ Envío de emails de 2FA
+
 ---
 
 ## 📊 Base de Datos
@@ -1078,6 +1174,7 @@ La aplicación usa **morgan** para logging HTTP en desarrollo y TypeORM logging 
 - `login_attempts` - Auditoría de logins
 - `notifications` - Notificaciones del sistema
 - `languages` - Idiomas disponibles
+- `refresh_tokens` - Tokens de refresco JWT
 
 ### Migraciones
 Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
@@ -1117,6 +1214,8 @@ Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
 4. **Sincronización**: El sistema detecta conflictos cuando el servidor tiene datos más recientes que el cliente.
 
 5. **Análisis IA**: Requiere al menos 7 días de logs para generar análisis significativo.
+
+6. **Restricción unique_active_code**: Solucionada eliminando códigos usados antiguos antes de marcar nuevos como usados, evitando conflictos de unicidad en la base de datos.
 
 ---
 
