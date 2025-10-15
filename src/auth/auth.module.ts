@@ -3,16 +3,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { VerificationModule } from 'src/verification/verification.module';
+import { LoginAttempt } from '../entities/login-attempt.entity';
 import { UserSettings } from '../entities/user-settings.entity';
 import { User } from '../entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { VerificationModule } from 'src/verification/verification.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserSettings]),
+    TypeOrmModule.forFeature([User, UserSettings, LoginAttempt]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

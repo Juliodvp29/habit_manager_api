@@ -1,3 +1,5 @@
+// src/verification/verification.service.ts
+
 import {
   BadRequestException,
   Injectable,
@@ -54,11 +56,13 @@ export class VerificationService {
     const code = this.generateCode();
     const expiresAt = this.getExpirationDate();
 
-    // Invalidar códigos anteriores del mismo tipo
-    await this.verificationCodeRepository.update(
-      { user: { id: userId }, type, isUsed: false },
-      { isUsed: true },
-    );
+    // 🔧 SOLUCIÓN: Eliminar códigos anteriores en lugar de actualizarlos
+    // Esto evita el conflicto con la restricción unique_active_code
+    await this.verificationCodeRepository.delete({
+      user: { id: userId },
+      type,
+      isUsed: false,
+    });
 
     // Crear nuevo código
     const verificationCode = this.verificationCodeRepository.create({

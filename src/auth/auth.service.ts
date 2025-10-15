@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { LoginAttempt } from '../entities/login-attempt.entity';
 import { UserSettings } from '../entities/user-settings.entity';
 import { User } from '../entities/user.entity';
 import { VerificationService } from '../verification/verification.service';
@@ -20,6 +21,8 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(UserSettings)
     private settingsRepository: Repository<UserSettings>,
+    @InjectRepository(LoginAttempt)
+    private loginAttemptRepository: Repository<LoginAttempt>,
     private jwtService: JwtService,
     private verificationService: VerificationService,
   ) { }
@@ -105,8 +108,8 @@ export class AuthService {
       );
     }
 
-    // DOBLE VERIFICACIÓN (2FA) - Siempre activada para mayor seguridad
-    const requires2FA = true;
+    // 🔧 MEJORA: 2FA INTELIGENTE - Solo en casos sospechosos
+    const requires2FA = await this.shouldRequire2FA(user.id, ipAddress, userAgent);
 
     if (requires2FA) {
       // Enviar código 2FA
@@ -123,14 +126,79 @@ export class AuthService {
 
       return {
         requires2FA: true,
-        message: 'Se ha enviado un código de verificación a tu email',
+        message: 'Se ha detectado un inicio de sesión inusual. Se ha enviado un código de verificación a tu email',
         userId: user.id,
         email: this.maskEmail(user.email),
+        reason: 'security_check', // Opcional: informar al usuario por qué
       };
     }
 
     // Si no requiere 2FA, generar token directamente
     return this.generateLoginResponse(user, ipAddress, userAgent);
+  }
+
+  /**
+   * 🧠 LÓGICA INTELIGENTE PARA 2FA
+   * Decide si se requiere 2FA basado en:
+   * 1. Nueva IP/dispositivo
+   * 2. Tiempo desde último login
+   * 3. Cambio de ubicación (opcional)
+   * 4. Configuración del usuario
+   */
+  private async shouldRequire2FA(
+    userId: number,
+    currentIp?: string,
+    currentUserAgent?: string,
+  ): Promise<boolean> {
+    // Obtener últimos 5 logins exitosos del usuario
+    const recentLogins = await this.loginAttemptRepository.find({
+      where: { user: { id: userId }, success: true },
+      order: { attemptedAt: 'DESC' },
+      take: 5,
+    });
+
+    // CASO 1: Si es el primer login, NO pedir 2FA (ya verificó email)
+    if (recentLogins.length === 0) {
+      return false;
+    }
+
+    // CASO 2: Nueva IP detectada
+    if (currentIp) {
+      const knownIps = recentLogins.map(login => login.ipAddress);
+      const isNewIp = !knownIps.includes(currentIp);
+
+      if (isNewIp) {
+        console.log(`🔒 2FA requerido: Nueva IP detectada para usuario ${userId}`);
+        return true;
+      }
+    }
+
+    // CASO 3: Nuevo dispositivo/navegador detectado
+    if (currentUserAgent) {
+      const knownUserAgents = recentLogins.map(login => login.userAgent);
+      const isNewDevice = !knownUserAgents.includes(currentUserAgent);
+
+      if (isNewDevice) {
+        console.log(`🔒 2FA requerido: Nuevo dispositivo detectado para usuario ${userId}`);
+        return true;
+      }
+    }
+
+    // CASO 4: Mucho tiempo sin iniciar sesión (más de 30 días)
+    const lastLogin = recentLogins[0];
+    const daysSinceLastLogin = Math.floor(
+      (new Date().getTime() - new Date(lastLogin.attemptedAt).getTime()) /
+      (1000 * 60 * 60 * 24)
+    );
+
+    if (daysSinceLastLogin > 30) {
+      console.log(`🔒 2FA requerido: ${daysSinceLastLogin} días sin actividad para usuario ${userId}`);
+      return true;
+    }
+
+    // CASO 5: Login desde dispositivo conocido reciente - NO pedir 2FA
+    console.log(`✅ Login desde dispositivo conocido - Sin 2FA para usuario ${userId}`);
+    return false;
   }
 
   async verify2FAAndLogin(
