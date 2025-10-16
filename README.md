@@ -267,6 +267,15 @@ CORS_ORIGIN=http://localhost:8100
 
 # Seguridad
 MAX_VERIFICATION_ATTEMPTS=3
+
+
+# Firebase Cloud Messaging
+FIREBASE_PROJECT_ID=tu-proyecto-id
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@tu-proyecto.iam.gserviceaccount.com
+# O simplemente la ruta al archivo JSON
+FIREBASE_CREDENTIALS_PATH=./config/firebase-admin-sdk.json
+
 ```
 
 ---
