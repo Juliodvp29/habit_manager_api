@@ -44,7 +44,6 @@ export class HabitsService {
     if (!habit) {
       throw new NotFoundException('Hábito no encontrado');
     }
-
     return habit;
   }
 
@@ -151,7 +150,7 @@ export class HabitsService {
 
     const dashboard = habits.map((habit) => {
       const todayLog = habit.logs.find(
-        (log) => log.logDate.getTime() === today.getTime(),
+        (log) => new Date(log.logDate).getTime() === today.getTime(),
       );
 
       return {
