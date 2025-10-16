@@ -1,13 +1,15 @@
+// src/notifications/notifications.service.ts (ACTUALIZADO)
+
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Repository, MoreThan, LessThan } from 'typeorm';
-import { Notification } from '../entities/notification.entity';
-import { User } from '../entities/user.entity';
-import { UserSettings } from '../entities/user-settings.entity';
-import { Habit } from '../entities/habit.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { HabitLog } from '../entities/habit-log.entity';
-import { LoginAttempt } from '../entities/login-attempt.entity';
+import { Habit } from '../entities/habit.entity';
+import { Notification } from '../entities/notification.entity';
+import { UserSettings } from '../entities/user-settings.entity';
+import { User } from '../entities/user.entity';
+import { FcmService } from '../fcm/fcm.service'; // ⬅️ NUEVO
 
 @Injectable()
 export class NotificationsService {
@@ -22,8 +24,7 @@ export class NotificationsService {
     private habitRepository: Repository<Habit>,
     @InjectRepository(HabitLog)
     private habitLogRepository: Repository<HabitLog>,
-    @InjectRepository(LoginAttempt)
-    private loginAttemptRepository: Repository<LoginAttempt>,
+    private fcmService: FcmService, // ⬅️ NUEVO
   ) { }
 
   async getUserNotifications(userId: number, unreadOnly: boolean = false) {
@@ -54,29 +55,45 @@ export class NotificationsService {
   }
 
   async markAllAsRead(userId: number) {
-    await this.notificationRepository.update(
+    const result = await this.notificationRepository.update(
       { user: { id: userId }, isRead: false },
       { isRead: true },
     );
 
-    return { message: 'Todas las notificaciones marcadas como leídas' };
+    return {
+      message: 'Todas las notificaciones marcadas como leídas',
+      markedCount: result.affected || 0,
+    };
   }
 
-  // Crear notificación
+  // ⬇️ MÉTODO ACTUALIZADO: Crear notificación Y enviar push
   async createNotification(
     userId: number,
     title: string,
     message: string,
     scheduledAt?: Date,
+    sendPush: boolean = true, // ⬅️ NUEVO parámetro
   ) {
     const notification = this.notificationRepository.create({
       user: { id: userId },
       title,
       message,
       scheduledAt: scheduledAt || new Date(),
+      sentAt: new Date(),
     });
 
-    return await this.notificationRepository.save(notification);
+    const saved = await this.notificationRepository.save(notification);
+
+    // ⬇️ NUEVO: Enviar push notification automáticamente
+    if (sendPush) {
+      try {
+        await this.fcmService.sendPushForNotification(saved.id);
+      } catch (error) {
+        console.error('Error sending push notification:', error);
+      }
+    }
+
+    return saved;
   }
 
   // Mensajes motivacionales
@@ -96,9 +113,11 @@ export class NotificationsService {
     return messages[Math.floor(Math.random() * messages.length)];
   }
 
-  // Recordatorios diarios
+  // ⬇️ CRON JOB ACTUALIZADO: Recordatorios diarios con push
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async sendDailyReminders() {
+    console.log('🔔 Ejecutando cron: recordatorios diarios...');
+
     const users = await this.userRepository.find({
       relations: ['settings'],
       where: { isActive: true },
@@ -107,34 +126,29 @@ export class NotificationsService {
     for (const user of users) {
       if (!user.settings?.notificationEnabled) continue;
 
-      const reminderTime = user.settings.reminderTime || '08:00';
-      const [hours, minutes] = reminderTime.split(':').map(Number);
+      const habits = await this.habitRepository.find({
+        where: { user: { id: user.id }, isActive: true },
+      });
 
-      const now = new Date();
-      const reminderDate = new Date(now);
-      reminderDate.setHours(hours, minutes, 0, 0);
-
-      // Solo enviar si es la hora del recordatorio
-      if (Math.abs(now.getTime() - reminderDate.getTime()) < 60000) { // 1 minuto de tolerancia
-        const habits = await this.habitRepository.find({
-          where: { user: { id: user.id }, isActive: true },
-        });
-
-        if (habits.length > 0) {
-          await this.createNotification(
-            user.id,
-            '¡Hora de tus hábitos!',
-            `Tienes ${habits.length} hábito(s) pendiente(s) hoy. ¡No olvides completarlos!`,
-            reminderDate,
-          );
-        }
+      if (habits.length > 0) {
+        await this.createNotification(
+          user.id,
+          '¡Hora de tus hábitos! 🎯',
+          `Tienes ${habits.length} hábito(s) pendiente(s) hoy. ¡No olvides completarlos!`,
+          new Date(),
+          true, // ⬅️ Enviar push
+        );
       }
     }
+
+    console.log('✅ Recordatorios diarios enviados');
   }
 
-  // Mensajes motivacionales diarios
+  // ⬇️ CRON JOB ACTUALIZADO: Mensajes motivacionales con push
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async sendMotivationalMessages() {
+    console.log('💪 Ejecutando cron: mensajes motivacionales...');
+
     const users = await this.userRepository.find({
       relations: ['settings'],
       where: { isActive: true },
@@ -146,16 +160,21 @@ export class NotificationsService {
       const message = this.getRandomMotivationalMessage();
       await this.createNotification(
         user.id,
-        'Mensaje motivacional del día',
+        'Mensaje motivacional del día ✨',
         message,
         new Date(),
+        true, // ⬅️ Enviar push
       );
     }
+
+    console.log('✅ Mensajes motivacionales enviados');
   }
 
-  // Notificaciones de rachas y logros
+  // ⬇️ CRON JOB ACTUALIZADO: Notificaciones de rachas con push
   @Cron(CronExpression.EVERY_DAY_AT_10PM)
   async checkStreaksAndAchievements() {
+    console.log('🏆 Ejecutando cron: verificando rachas y logros...');
+
     const users = await this.userRepository.find({
       relations: ['settings'],
       where: { isActive: true },
@@ -195,71 +214,51 @@ export class NotificationsService {
             }
           }
 
-          // Notificar rachas importantes
+          // Notificar rachas importantes CON PUSH
           if (currentStreak === 3) {
             await this.createNotification(
               user.id,
-              '¡Nueva racha!',
+              '🔥 ¡Nueva racha de 3 días!',
               `¡Felicitaciones! Has completado "${habit.title}" por 3 días consecutivos.`,
+              new Date(),
+              true, // ⬅️ Enviar push
             );
           } else if (currentStreak === 7) {
             await this.createNotification(
               user.id,
-              '¡Semana completa!',
+              '🎉 ¡Semana completa!',
               `¡Increíble! Has mantenido "${habit.title}" por una semana entera.`,
+              new Date(),
+              true, // ⬅️ Enviar push
             );
           } else if (currentStreak === 30) {
             await this.createNotification(
               user.id,
-              '¡Mes completo!',
+              '💎 ¡Mes completo!',
               `¡Fantástico! Has completado "${habit.title}" todos los días de este mes.`,
+              new Date(),
+              true, // ⬅️ Enviar push
             );
           }
         }
       }
     }
+
+    console.log('✅ Verificación de rachas completada');
   }
 
-  // Notificaciones de seguridad
-  async checkFailedLoginAttempts() {
-    const oneHourAgo = new Date();
-    oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-
-    // Obtener usuarios con múltiples intentos fallidos en la última hora
-    const usersWithFailedAttempts = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoin('user.loginAttempts', 'attempt')
-      .where('attempt.success = :success', { success: false })
-      .andWhere('attempt.attemptedAt > :oneHourAgo', { oneHourAgo })
-      .groupBy('user.id')
-      .having('COUNT(attempt.id) >= :count', { count: 3 })
-      .getMany();
-
-    for (const user of usersWithFailedAttempts) {
-      const settings = await this.userSettingsRepository.findOne({
-        where: { user: { id: user.id } },
-      });
-
-      if (settings?.notificationEnabled) {
-        await this.createNotification(
-          user.id,
-          '⚠️ Actividad sospechosa detectada',
-          'Se han detectado múltiples intentos fallidos de inicio de sesión en tu cuenta. Si no fuiste tú, cambia tu contraseña inmediatamente.',
-        );
-      }
-    }
-  }
-
-  // Resúmenes semanales
+  // ⬇️ CRON JOB ACTUALIZADO: Resúmenes semanales con push
   @Cron(CronExpression.EVERY_WEEK)
   async sendWeeklySummaries() {
+    console.log('📊 Ejecutando cron: resúmenes semanales...');
+
     const users = await this.userRepository.find({
       relations: ['settings'],
       where: { isActive: true },
     });
 
     for (const user of users) {
-      if (!user.settings?.weeklySummary) continue;
+      if (!user.settings?.weeklySummary || !user.settings?.notificationEnabled) continue;
 
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
@@ -285,19 +284,57 @@ export class NotificationsService {
         user.id,
         '📊 Resumen semanal',
         `Esta semana completaste ${totalCompleted} hábitos de un total posible de ${totalHabits * 7}. Tasa de completitud: ${completionRate.toFixed(1)}%. ¡Sigue así!`,
+        new Date(),
+        true, // ⬅️ Enviar push
       );
     }
+
+    console.log('✅ Resúmenes semanales enviados');
+  }
+
+  // ⬇️ NUEVO: Cron job para reenviar notificaciones push fallidas
+  @Cron(CronExpression.EVERY_HOUR)
+  async retryFailedPushNotifications() {
+    console.log('🔄 Ejecutando cron: reintentando notificaciones push fallidas...');
+
+    // Buscar notificaciones de las últimas 24 horas que no se enviaron
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+    const failedNotifications = await this.notificationRepository.find({
+      where: {
+        pushSent: false,
+        scheduledAt: LessThan(new Date()),
+        sentAt: LessThan(new Date()),
+      },
+      relations: ['user'],
+      take: 50, // Limitar a 50 por ejecución
+    });
+
+    for (const notification of failedNotifications) {
+      try {
+        await this.fcmService.sendPushForNotification(notification.id);
+      } catch (error) {
+        console.error(`Error reintentando push para notificación ${notification.id}:`, error);
+      }
+    }
+
+    console.log(`✅ Reintentos completados: ${failedNotifications.length} notificaciones procesadas`);
   }
 
   // Limpiar notificaciones antiguas
   @Cron(CronExpression.EVERY_WEEK)
   async cleanupOldNotifications() {
+    console.log('🧹 Ejecutando cron: limpieza de notificaciones antiguas...');
+
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-    await this.notificationRepository.delete({
+    const result = await this.notificationRepository.delete({
       scheduledAt: LessThan(twoWeeksAgo),
       isRead: true,
     });
+
+    console.log(`✅ Limpiadas ${result.affected || 0} notificaciones antiguas`);
   }
 }

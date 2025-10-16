@@ -1,3 +1,5 @@
+// src/app.module.ts (ACTUALIZADO)
+
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -6,11 +8,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { EmailModule } from './email/email.module';
+import { FcmModule } from './fcm/fcm.module'; // ⬅️ NUEVO
 import { HabitsModule } from './habits/habits.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { VerificationModule } from './verification/verification.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -29,7 +33,6 @@ import { VerificationModule } from './verification/verification.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false, // ⚠️ Usar migraciones en producción
         logging: configService.get('NODE_ENV') === 'development',
-
       }),
       inject: [ConfigService],
     }),
@@ -41,6 +44,7 @@ import { VerificationModule } from './verification/verification.module';
     NotificationsModule,
     EmailModule,
     VerificationModule,
+    FcmModule, // ⬅️ NUEVO: Importar FcmModule
   ],
   controllers: [AppController],
   providers: [AppService],

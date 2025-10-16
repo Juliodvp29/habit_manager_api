@@ -1,14 +1,15 @@
+
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { NotificationsService } from './notifications.service';
-import { NotificationsController } from './notifications.controller';
-import { Notification } from '../entities/notification.entity';
-import { User } from '../entities/user.entity';
-import { Habit } from '../entities/habit.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { FcmModule } from 'src/fcm/fcm.module';
 import { HabitLog } from '../entities/habit-log.entity';
+import { Habit } from '../entities/habit.entity';
+import { Notification } from '../entities/notification.entity';
 import { UserSettings } from '../entities/user-settings.entity';
-import { LoginAttempt } from '../entities/login-attempt.entity';
+import { User } from '../entities/user.entity';
+import { NotificationsController } from './notifications.controller';
+import { NotificationsService } from './notifications.service';
 
 @Module({
   imports: [
@@ -19,8 +20,8 @@ import { LoginAttempt } from '../entities/login-attempt.entity';
       Habit,
       HabitLog,
       UserSettings,
-      LoginAttempt,
     ]),
+    FcmModule, // ⬅️ NUEVO: Importar FcmModule
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService],

@@ -1,3 +1,5 @@
+// src/entities/notification.entity.ts (ACTUALIZADO)
+
 import {
   Column,
   Entity,
@@ -30,4 +32,13 @@ export class Notification {
 
   @Column({ type: 'boolean', default: false, name: 'is_read' })
   isRead: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'push_sent' })
+  pushSent: boolean;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'push_sent_at' })
+  pushSentAt: Date;
+
+  @Column({ type: 'text', nullable: true, name: 'push_error' })
+  pushError: string;
 }

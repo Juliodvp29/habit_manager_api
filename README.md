@@ -1080,6 +1080,258 @@ Todas las rutas protegidas requieren un token JWT en el header:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+
+# 📱 Firebase Cloud Messaging (FCM) - Sección para README
+
+
+## 🔔 Firebase Cloud Messaging (FCM)
+
+### Características Implementadas
+
+- ✅ Registro automático de tokens de dispositivos
+- ✅ Envío automático de push notifications con cada notificación
+- ✅ Soporte para múltiples dispositivos por usuario
+- ✅ Detección y limpieza de tokens inválidos
+- ✅ Reintentos automáticos de notificaciones fallidas
+- ✅ Soporte para iOS, Android y Web
+- ✅ Tracking de estado de envío (exitoso/fallido)
+
+### Configuración
+
+#### 1. Obtener Credenciales de Firebase
+
+1. Ve a [Firebase Console](https://console.firebase.google.com/)
+2. Crea o selecciona tu proyecto
+3. Ve a **Project Settings** > **Service Accounts**
+4. Haz clic en **Generate new private key**
+5. Guarda el archivo JSON
+
+#### 2. Configurar Variables de Entorno
+
+Agrega al archivo `.env`:
+
+```env
+# Opción 1: Usar archivo JSON (recomendado)
+FIREBASE_CREDENTIALS_PATH=./config/firebase-admin-sdk.json
+
+# Opción 2: Variables individuales
+FIREBASE_PROJECT_ID=tu-proyecto-id
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@tu-proyecto.iam.gserviceaccount.com
+```
+
+#### 3. Ejecutar Migración de Base de Datos
+
+```bash
+psql -U postgres -d habit_manager -f migrations/device_tokens.sql
+```
+
+### Endpoints FCM
+
+#### Registrar Token de Dispositivo
+
+```http
+POST /api/v1/fcm/register
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "token": "fcm_token_del_dispositivo",
+  "deviceType": "android",
+  "deviceName": "Samsung Galaxy S21"
+}
+```
+
+#### Desregistrar Token (Logout)
+
+```http
+DELETE /api/v1/fcm/unregister
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "token": "fcm_token_del_dispositivo"
+}
+```
+
+### Funcionamiento Automático
+
+#### Notificaciones que Envían Push Automáticamente:
+
+1. **Recordatorios Diarios** (8:00 AM)
+   - Se envía a todos los usuarios con notificaciones habilitadas
+   - Informa sobre hábitos pendientes del día
+
+2. **Mensajes Motivacionales** (9:00 AM)
+   - Mensaje inspirador diario
+   - Aleatorio de una lista predefinida
+
+3. **Notificaciones de Rachas** (10:00 PM)
+   - Al completar 3, 7 o 30 días consecutivos
+   - Celebración de logros
+
+4. **Resúmenes Semanales** (Cada lunes)
+   - Estadísticas de la semana anterior
+   - Tasa de cumplimiento
+
+5. **Alertas de Seguridad**
+   - Login desde nueva ubicación
+   - Intentos fallidos de login
+
+### Estructura de la Notificación Push
+
+```json
+{
+  "notification": {
+    "title": "¡Hora de tus hábitos! 🎯",
+    "body": "Tienes 3 hábito(s) pendiente(s) hoy."
+  },
+  "data": {
+    "notificationId": "123",
+    "type": "habit_reminder"
+  }
+}
+```
+
+### Tablas de Base de Datos
+
+#### `device_tokens`
+- Almacena tokens FCM de dispositivos
+- Relacionada con usuarios (ON DELETE CASCADE)
+- Campos: token, deviceType, deviceName, isActive
+
+#### `notifications` (actualizada)
+- Nuevos campos: `push_sent`, `push_sent_at`, `push_error`
+- Tracking de estado de envío push
+
+### Cron Jobs FCM
+
+| Cron Job | Frecuencia | Descripción |
+|----------|-----------|-------------|
+| `sendDailyReminders` | Diario 8:00 AM | Recordatorios de hábitos |
+| `sendMotivationalMessages` | Diario 9:00 AM | Mensajes motivacionales |
+| `checkStreaksAndAchievements` | Diario 10:00 PM | Notificaciones de logros |
+| `sendWeeklySummaries` | Semanal (Lunes) | Resúmenes semanales |
+| `retryFailedPushNotifications` | Cada hora | Reintentar envíos fallidos |
+
+
+### Troubleshooting
+
+#### ❌ Error: "Firebase not initialized"
+```bash
+# Verificar que existan las credenciales
+ls config/firebase-admin-sdk.json
+
+# O verificar variables de entorno
+echo $FIREBASE_PROJECT_ID
+```
+
+#### ❌ Error: "messaging/invalid-registration-token"
+- El token FCM es inválido o expiró
+- Se marca automáticamente como inactivo
+- El cliente debe registrar un nuevo token
+
+#### ❌ No se reciben notificaciones push
+1. Verificar que Firebase esté inicializado correctamente
+2. Verificar que el usuario tenga `notificationEnabled: true`
+3. Verificar que existan tokens activos en la BD
+4. Revisar logs de la columna `push_error` en la tabla `notifications`
+
+### Testing con curl
+
+```bash
+# Registrar token de prueba
+curl -X POST https://tu-api.com/api/v1/fcm/register \
+  -H "Authorization: Bearer {jwt_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "test_token_123",
+    "deviceType": "android",
+    "deviceName": "Test Device"
+  }'
+
+# Crear notificación (se enviará push automáticamente)
+curl -X POST https://tu-api.com/api/v1/notifications \
+  -H "Authorization: Bearer {jwt_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Test Push",
+    "message": "Probando notificación push",
+    "sendPush": true
+  }'
+```
+
+### Seguridad
+
+- ✅ Las credenciales de Firebase no se exponen al cliente
+- ✅ Tokens FCM vinculados a usuarios autenticados (JWT)
+- ✅ Validación de pertenencia antes de enviar push
+- ✅ Limpieza automática de tokens inválidos
+- ✅ Tokens se desactivan en logout
+
+### Performance
+
+- Envío en lote usando `sendEachForMulticast`
+- Máximo 500 tokens por lote (límite de Firebase)
+- Reintentos automáticos cada hora
+- Limpieza semanal de tokens antiguos
+
+### Integración con Cliente Móvil
+
+Ver documentación completa en: [FCM_CLIENT_INTEGRATION.md](./docs/FCM_CLIENT_INTEGRATION.md)
+
+#### Flujo básico:
+
+```
+1. Usuario hace login → Obtiene JWT
+2. App obtiene FCM token → POST /fcm/register
+3. Servidor crea notificación → Envía push automáticamente
+4. Usuario recibe notificación en tiempo real
+5. Al hacer logout → DELETE /fcm/unregister
+```
+
+---
+
+## 📊 Estadísticas de Notificaciones
+
+### Consultas SQL Útiles
+
+```sql
+-- Ver tokens activos por usuario
+SELECT u.email, COUNT(dt.id) as devices_count
+FROM users u
+LEFT JOIN device_tokens dt ON dt.user_id = u.id AND dt.is_active = true
+GROUP BY u.email;
+
+-- Ver notificaciones enviadas hoy
+SELECT 
+  COUNT(*) as total_sent,
+  SUM(CASE WHEN push_sent = true THEN 1 ELSE 0 END) as push_sent,
+  SUM(CASE WHEN push_error IS NOT NULL THEN 1 ELSE 0 END) as push_failed
+FROM notifications
+WHERE sent_at::date = CURRENT_DATE;
+
+-- Ver tokens por tipo de dispositivo
+SELECT device_type, COUNT(*) as count
+FROM device_tokens
+WHERE is_active = true
+GROUP BY device_type;
+
+-- Ver usuarios sin tokens registrados
+SELECT u.email, u.full_name
+FROM users u
+LEFT JOIN device_tokens dt ON dt.user_id = u.id AND dt.is_active = true
+WHERE u.is_active = true AND dt.id IS NULL;
+```
+
+## 📖 Referencias
+
+- [Firebase Cloud Messaging Docs](https://firebase.google.com/docs/cloud-messaging)
+- [Firebase Admin SDK](https://firebase.google.com/docs/admin/setup)
+- [Best Practices for FCM](https://firebase.google.com/docs/cloud-messaging/best-practices)
+
+
+
 ### Flujo de Autenticación
 
 1. **Registro** → Usuario recibe código de verificación por email
