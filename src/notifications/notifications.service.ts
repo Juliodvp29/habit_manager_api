@@ -193,7 +193,7 @@ export class NotificationsService {
         today.setHours(0, 0, 0, 0);
 
         const todayLog = habit.logs.find(
-          (log) => log.logDate.getTime() === today.getTime(),
+          (log) => new Date(log.logDate).getTime() === today.getTime(),
         );
 
         if (todayLog?.completed) {
@@ -206,7 +206,7 @@ export class NotificationsService {
           let expectedDate = new Date(today);
 
           for (const log of sortedLogs) {
-            if (log.logDate.getTime() === expectedDate.getTime()) {
+            if (new Date(log.logDate).getTime() === expectedDate.getTime()) {
               currentStreak++;
               expectedDate.setDate(expectedDate.getDate() - 1);
             } else {
@@ -273,7 +273,7 @@ export class NotificationsService {
 
       for (const habit of habits) {
         const weeklyLogs = habit.logs.filter(
-          (log) => log.logDate >= weekAgo && log.completed,
+          (log) => new Date(log.logDate) >= weekAgo && log.completed,
         );
         totalCompleted += weeklyLogs.length;
       }
