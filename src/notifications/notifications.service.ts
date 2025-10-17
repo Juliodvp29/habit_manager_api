@@ -170,6 +170,32 @@ export class NotificationsService {
     console.log('✅ Mensajes motivacionales enviados');
   }
 
+  // ⬇️ NUEVO: Recordatorios nocturnos a las 9:10 PM con push
+  @Cron('10 21 * * *')
+  async sendEveningReminders() {
+    console.log('🌙 Ejecutando cron: recordatorios nocturnos...');
+
+    const users = await this.userRepository.find({
+      relations: ['settings'],
+      where: { isActive: true },
+    });
+
+    for (const user of users) {
+      if (!user.settings?.notificationEnabled) continue;
+
+      const message = this.getRandomMotivationalMessage();
+      await this.createNotification(
+        user.id,
+        'Buenas noches 🌙',
+        `Antes de dormir, reflexiona: ${message}`,
+        new Date(),
+        true, // ⬅️ Enviar push
+      );
+    }
+
+    console.log('✅ Recordatorios nocturnos enviados');
+  }
+
   // ⬇️ CRON JOB ACTUALIZADO: Notificaciones de rachas con push
   @Cron(CronExpression.EVERY_DAY_AT_10PM)
   async checkStreaksAndAchievements() {

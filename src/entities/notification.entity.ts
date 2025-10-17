@@ -23,7 +23,6 @@ export class Notification {
 
   @Column({ type: 'text', nullable: true })
   message: string;
-
   @Column({ type: 'timestamp', nullable: true, name: 'scheduled_at' })
   scheduledAt: Date;
 
