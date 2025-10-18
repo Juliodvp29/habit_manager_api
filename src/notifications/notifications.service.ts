@@ -24,7 +24,7 @@ export class NotificationsService {
     private habitRepository: Repository<Habit>,
     @InjectRepository(HabitLog)
     private habitLogRepository: Repository<HabitLog>,
-    private fcmService: FcmService, // ⬅️ NUEVO
+    private fcmService: FcmService,
   ) { }
 
   async getUserNotifications(userId: number, unreadOnly: boolean = false) {

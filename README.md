@@ -125,17 +125,19 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 API REST desarrollada en NestJS para el proyecto **Habit Manager con IA**. Esta API proporciona servicios de backend para una aplicación móvil híbrida que permite a los usuarios crear, gestionar y analizar sus hábitos con ayuda de inteligencia artificial.
 
 ### Tecnologías Principales
-- **NestJS** v11 - Framework de Node.js
+- **NestJS** v11.0.1 - Framework de Node.js
 - **TypeORM** v0.3.27 - ORM para PostgreSQL
-- **PostgreSQL** - Base de datos relacional
+- **PostgreSQL** >= 14.x - Base de datos relacional
 - **JWT** - Autenticación basada en tokens
 - **bcrypt** v6.0.0 - Hash de contraseñas
 - **Nodemailer** v7.0.9 - Envío de correos electrónicos
 - **OpenAI API** - Análisis y recomendaciones con IA (opcional)
-- **Passport** - Autenticación con estrategias
-- **Helmet** - Seguridad HTTP headers
-- **Morgan** - Logging HTTP
+- **Passport** v0.7.0 - Autenticación con estrategias
+- **Helmet** v8.1.0 - Seguridad HTTP headers
+- **Morgan** v1.10.1 - Logging HTTP
 - **CORS** - Configuración de CORS
+- **Firebase Admin SDK** v13.5.0 - Notificaciones push FCM
+- **@nestjs/schedule** v6.0.1 - Cron jobs automáticos
 
 ---
 
@@ -1360,13 +1362,13 @@ WHERE u.is_active = true AND dt.id IS NULL;
 - ✅ CORS configurado
 - ✅ Helmet para headers de seguridad
 - ✅ Validación de DTOs con class-validator
-
+R
 ---
 
 ## ⏳ Funcionalidades Pendientes
 
 ### Alta Prioridad
-- ⚠️ **Firebase Cloud Messaging (FCM)** - Notificaciones push reales para app móvil
+- ✅ **Firebase Cloud Messaging (FCM)** - Notificaciones push reales para app móvil (IMPLEMENTADO)
 - ✅ **Cron Jobs** - Sistema completo de tareas programadas para notificaciones automáticas
 - ⚠️ **Rate Limiting** - Limitar peticiones por IP/usuario
 - ⚠️ **Paginación** - Implementar en listados grandes
@@ -1453,6 +1455,9 @@ npm run test:e2e
 
 # Cobertura
 npm run test:cov
+
+# Tests con debug
+npm run test:debug
 ```
 
 **⚠️ Nota:** Los tests están pendientes de implementación.
@@ -1498,6 +1503,8 @@ Los procesos de verificación 2FA incluyen logs detallados para debugging:
 ### Migraciones
 Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
 
+**⚠️ Nota:** En producción, `synchronize: false` está configurado para usar migraciones controladas.
+
 **⚠️ Recomendación:** Implementar migraciones con TypeORM para control de versiones.
 
 ---
@@ -1511,11 +1518,11 @@ Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
 4. **Heroku** - Deploy simple (con PostgreSQL addon)
 
 ### Checklist de Producción
-- [ ] Configurar variables de entorno
-- [ ] Usar `synchronize: false` en TypeORM
+- [x] Configurar variables de entorno
+- [x] Usar `synchronize: false` en TypeORM
 - [ ] Implementar rate limiting
-- [ ] Configurar CORS correctamente
-- [ ] Habilitar HTTPS
+- [x] Configurar CORS correctamente
+- [x] Habilitar HTTPS
 - [ ] Configurar logs con Winston
 - [ ] Implementar health check endpoint
 - [ ] Configurar backup de BD
@@ -1541,6 +1548,10 @@ Actualmente se usa el archivo SQL `habit_ai_v2.sql` para crear el esquema.
 8. **Notificaciones de Seguridad**: Se activan automáticamente ante intentos fallidos de login o accesos desde nuevas ubicaciones.
 
 9. **Restricción unique_active_code**: Solucionada eliminando códigos usados antiguos antes de marcar nuevos como usados, evitando conflictos de unicidad en la base de datos.
+
+10. **Firebase Cloud Messaging**: Las notificaciones push se envían automáticamente cuando se crean notificaciones en el sistema. Requiere configuración de credenciales FCM.
+
+11. **Cron Jobs**: Los trabajos programados se ejecutan automáticamente usando @nestjs/schedule. Incluyen recordatorios diarios, mensajes motivacionales, notificaciones de rachas y resúmenes semanales.
 
 ---
 
