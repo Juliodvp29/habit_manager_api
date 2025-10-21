@@ -67,8 +67,9 @@ export class HabitsService {
   ) {
     const habit = await this.findOne(habitId, userId);
 
+    // ⭐ CORRECCIÓN: Normalizar la fecha correctamente
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0); // Usar UTC para evitar problemas de zona horaria
 
     // Buscar o crear log del día
     let log = await this.logRepository.findOne({
@@ -76,31 +77,51 @@ export class HabitsService {
         habit: { id: habitId },
         logDate: today,
       },
+      relations: ['habit'],
     });
 
     if (!log) {
+      // NUEVO LOG
       log = this.logRepository.create({
         habit,
         logDate: today,
         progress: logHabitDto.progress,
-        notes: logHabitDto.notes,
+        notes: logHabitDto.notes || null,
         completed: logHabitDto.progress >= habit.targetCount,
+        syncStatus: 'synced',
       });
+      console.log('✅ Creando nuevo log para hoy:', today.toISOString());
     } else {
-      log.progress = logHabitDto.progress;
-      log.notes = logHabitDto.notes || null;
-      log.completed = logHabitDto.progress >= habit.targetCount;
+      // ACTUALIZAR LOG EXISTENTE
+      log.progress += logHabitDto.progress; // ⭐ ACUMULAR progreso
+      log.notes = logHabitDto.notes || log.notes;
+      log.completed = log.progress >= habit.targetCount;
+      console.log('✅ Actualizando log existente. Progreso:', log.progress);
     }
 
-    return await this.logRepository.save(log);
+    const savedLog = await this.logRepository.save(log);
+
+    // ⭐ IMPORTANTE: Devolver el log con toda la información
+    return {
+      id: savedLog.id,
+      habitId: habit.id,
+      logDate: savedLog.logDate,
+      progress: savedLog.progress,
+      completed: savedLog.completed,
+      notes: savedLog.notes,
+      createdAt: savedLog.createdAt,
+    };
   }
 
   async getStats(habitId: number, userId: number, days: number = 30) {
     const habit = await this.findOne(habitId, userId);
 
     const endDate = new Date();
+    endDate.setUTCHours(23, 59, 59, 999);
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    startDate.setUTCHours(0, 0, 0, 0);
 
     const logs = await this.logRepository.find({
       where: {
@@ -145,13 +166,36 @@ export class HabitsService {
       order: { createdAt: 'DESC' },
     });
 
+    // ⭐ CORRECCIÓN: Normalizar fecha para comparación
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+
+    console.log('📅 Dashboard - Fecha de hoy (UTC):', today.toISOString());
 
     const dashboard = habits.map((habit) => {
-      const todayLog = habit.logs.find(
-        (log) => new Date(log.logDate).getTime() === today.getTime(),
-      );
+      // Buscar el log de hoy normalizando las fechas
+      const todayLog = habit.logs.find((log) => {
+        const logDate = new Date(log.logDate);
+        logDate.setUTCHours(0, 0, 0, 0);
+        const logTime = logDate.getTime();
+
+        const isToday = logTime === todayTime;
+
+        if (isToday) {
+          console.log(`✅ Hábito "${habit.title}" - Log encontrado:`, {
+            logDate: logDate.toISOString(),
+            progress: log.progress,
+            completed: log.completed
+          });
+        }
+
+        return isToday;
+      });
+
+      // ⭐ CORRECCIÓN: Calcular racha correctamente usando todos los logs del usuario
+      const allLogs = habit.logs;
+      const currentStreak = this.calculateStreak(allLogs);
 
       return {
         id: habit.id,
@@ -159,11 +203,70 @@ export class HabitsService {
         description: habit.description,
         frequency: habit.frequency,
         targetCount: habit.targetCount,
+        isActive: habit.isActive,
         todayCompleted: todayLog?.completed || false,
         todayProgress: todayLog?.progress || 0,
+        currentStreak,
+        createdAt: habit.createdAt,
+        updatedAt: habit.updatedAt,
       };
     });
 
     return dashboard;
+  }
+
+  /**
+   * NUEVO: Calcular racha actual de un hábito
+   */
+  private calculateStreak(logs: HabitLog[]): number {
+    if (!logs || logs.length === 0) return 0;
+
+    // Obtener todos los logs completados y ordenarlos por fecha descendente
+    const completedLogs = logs
+      .filter(log => log.completed)
+      .sort((a, b) => new Date(b.logDate).getTime() - new Date(a.logDate).getTime());
+
+    if (completedLogs.length === 0) return 0;
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const lastCompletedDate = new Date(completedLogs[0].logDate);
+    lastCompletedDate.setUTCHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let streak = 0;
+
+    // Si el último completado es de hoy, iniciar racha en 1
+    if (lastCompletedDate.getTime() === today.getTime()) {
+      streak = 1;
+    }
+    // Si el último completado es de ayer, iniciar racha en 1
+    else if (lastCompletedDate.getTime() === yesterday.getTime()) {
+      streak = 1;
+    }
+    // Si es de antes, racha es 0
+    else {
+      return 0;
+    }
+
+    // Buscar días consecutivos anteriores al último completado
+    for (let i = 1; i < completedLogs.length; i++) {
+      const logDate = new Date(completedLogs[i].logDate);
+      logDate.setUTCHours(0, 0, 0, 0);
+
+      const expectedDate = new Date(lastCompletedDate);
+      expectedDate.setDate(expectedDate.getDate() - i);
+
+      if (logDate.getTime() === expectedDate.getTime()) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
   }
 }
