@@ -19,6 +19,42 @@ export class HabitsService {
     private logRepository: Repository<HabitLog>,
   ) { }
 
+  /**
+   * NUEVA FUNCIÓN: Normalizar fecha a string YYYY-MM-DD
+   * Esto evita problemas de zona horaria
+   */
+  private getDateString(date?: Date | string): string {
+    // Si ya es un string en formato YYYY-MM-DD, devolverlo directamente
+    if (typeof date === 'string') {
+      // Validar que tenga formato YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(date)) {
+        return date.substring(0, 10); // Tomar solo YYYY-MM-DD
+      }
+    }
+
+    // Si no hay fecha, usar hoy
+    let d: Date;
+    if (!date) {
+      d = new Date();
+    } else {
+      d = date instanceof Date ? date : new Date(date);
+    }
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * NUEVA FUNCIÓN: Comparar dos fechas ignorando la hora
+   */
+  private isSameDay(date1: Date | string, date2: Date | string): boolean {
+    const d1 = this.getDateString(date1);
+    const d2 = this.getDateString(date2);
+    return d1 === d2;
+  }
+
   async create(userId: number, createHabitDto: CreateHabitDto) {
     const habit = this.habitRepository.create({
       ...createHabitDto,
@@ -67,45 +103,43 @@ export class HabitsService {
   ) {
     const habit = await this.findOne(habitId, userId);
 
-    // ⭐ CORRECCIÓN: Normalizar la fecha correctamente
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0); // Usar UTC para evitar problemas de zona horaria
+    // ⭐ CORRECCIÓN: Usar string de fecha directamente
+    const todayString = this.getDateString();
+    console.log('📅 logProgress - Fecha de hoy (string):', todayString);
 
-    // Buscar o crear log del día
-    let log = await this.logRepository.findOne({
-      where: {
-        habit: { id: habitId },
-        logDate: today,
-      },
-      relations: ['habit'],
-    });
+    // Buscar log del día usando query builder para mejor control
+    let log = await this.logRepository
+      .createQueryBuilder('log')
+      .innerJoin('log.habit', 'habit')
+      .where('habit.id = :habitId', { habitId })
+      .andWhere('log.logDate = :logDate', { logDate: todayString })
+      .getOne();
 
     if (!log) {
       // NUEVO LOG
       log = this.logRepository.create({
         habit,
-        logDate: today,
+        logDate: new Date(todayString), // Convertir string a Date
         progress: logHabitDto.progress,
         notes: logHabitDto.notes || null,
         completed: logHabitDto.progress >= habit.targetCount,
         syncStatus: 'synced',
       });
-      console.log('✅ Creando nuevo log para hoy:', today.toISOString());
+      console.log('✅ Creando nuevo log para:', todayString);
     } else {
       // ACTUALIZAR LOG EXISTENTE
-      log.progress += logHabitDto.progress; // ⭐ ACUMULAR progreso
+      log.progress += logHabitDto.progress; // Acumular progreso
       log.notes = logHabitDto.notes || log.notes;
       log.completed = log.progress >= habit.targetCount;
-      console.log('✅ Actualizando log existente. Progreso:', log.progress);
+      console.log('✅ Actualizando log existente. Progreso total:', log.progress);
     }
 
     const savedLog = await this.logRepository.save(log);
 
-    // ⭐ IMPORTANTE: Devolver el log con toda la información
     return {
       id: savedLog.id,
       habitId: habit.id,
-      logDate: savedLog.logDate,
+      logDate: this.getDateString(savedLog.logDate),
       progress: savedLog.progress,
       completed: savedLog.completed,
       notes: savedLog.notes,
@@ -117,11 +151,11 @@ export class HabitsService {
     const habit = await this.findOne(habitId, userId);
 
     const endDate = new Date();
-    endDate.setUTCHours(23, 59, 59, 999);
+    endDate.setHours(23, 59, 59, 999);
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    startDate.setUTCHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
 
     const logs = await this.logRepository.find({
       where: {
@@ -166,25 +200,32 @@ export class HabitsService {
       order: { createdAt: 'DESC' },
     });
 
-    // ⭐ CORRECCIÓN: Normalizar fecha para comparación
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
-
-    console.log('📅 Dashboard - Fecha de hoy (UTC):', today.toISOString());
+    // ⭐ CORRECCIÓN: Usar string de fecha
+    const todayString = this.getDateString();
+    console.log('📅 Dashboard - Fecha de hoy (string):', todayString);
 
     const dashboard = habits.map((habit) => {
-      // Buscar el log de hoy normalizando las fechas
-      const todayLog = habit.logs.find((log) => {
-        const logDate = new Date(log.logDate);
-        logDate.setUTCHours(0, 0, 0, 0);
-        const logTime = logDate.getTime();
+      console.log(`\n🔍 Analizando hábito "${habit.title}" (ID: ${habit.id})`);
+      console.log(`   Total de logs: ${habit.logs.length}`);
 
-        const isToday = logTime === todayTime;
+      // Mostrar todos los logs para debug
+      habit.logs.forEach((log, index) => {
+        const logDateString = this.getDateString(log.logDate);
+        console.log(`   Log ${index + 1}: ${logDateString} | Progress: ${log.progress} | Completed: ${log.completed}`);
+        console.log(`      Raw logDate:`, log.logDate);
+        console.log(`      Tipo de logDate:`, typeof log.logDate);
+      });
+
+      // Buscar el log de hoy usando comparación de strings
+      const todayLog = habit.logs.find((log) => {
+        const logDateString = this.getDateString(log.logDate);
+        const isToday = this.isSameDay(logDateString, todayString);
+
+        console.log(`   Comparando: "${logDateString}" === "${todayString}" ? ${isToday}`);
 
         if (isToday) {
           console.log(`✅ Hábito "${habit.title}" - Log encontrado:`, {
-            logDate: logDate.toISOString(),
+            logDate: logDateString,
             progress: log.progress,
             completed: log.completed
           });
@@ -193,9 +234,12 @@ export class HabitsService {
         return isToday;
       });
 
-      // ⭐ CORRECCIÓN: Calcular racha correctamente usando todos los logs del usuario
-      const allLogs = habit.logs;
-      const currentStreak = this.calculateStreak(allLogs);
+      if (!todayLog) {
+        console.log(`❌ No se encontró log de hoy para "${habit.title}"`);
+      }
+
+      // Calcular racha correctamente
+      const currentStreak = this.calculateStreak(habit.logs);
 
       return {
         id: habit.id,
@@ -216,7 +260,7 @@ export class HabitsService {
   }
 
   /**
-   * NUEVO: Calcular racha actual de un hábito
+   * Calcular racha actual de un hábito
    */
   private calculateStreak(logs: HabitLog[]): number {
     if (!logs || logs.length === 0) return 0;
@@ -228,39 +272,34 @@ export class HabitsService {
 
     if (completedLogs.length === 0) return 0;
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const todayString = this.getDateString();
+    const lastCompletedString = this.getDateString(completedLogs[0].logDate);
 
-    const lastCompletedDate = new Date(completedLogs[0].logDate);
-    lastCompletedDate.setUTCHours(0, 0, 0, 0);
-
-    const yesterday = new Date(today);
+    // Calcular fecha de ayer
+    const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = this.getDateString(yesterday);
 
     let streak = 0;
 
-    // Si el último completado es de hoy, iniciar racha en 1
-    if (lastCompletedDate.getTime() === today.getTime()) {
+    // Si el último completado es de hoy o ayer, iniciar racha en 1
+    if (this.isSameDay(lastCompletedString, todayString) ||
+      this.isSameDay(lastCompletedString, yesterdayString)) {
       streak = 1;
-    }
-    // Si el último completado es de ayer, iniciar racha en 1
-    else if (lastCompletedDate.getTime() === yesterday.getTime()) {
-      streak = 1;
-    }
-    // Si es de antes, racha es 0
-    else {
+    } else {
+      // Si es de antes de ayer, racha es 0
       return 0;
     }
 
-    // Buscar días consecutivos anteriores al último completado
+    // Buscar días consecutivos anteriores
+    let expectedDate = new Date(completedLogs[0].logDate);
+
     for (let i = 1; i < completedLogs.length; i++) {
       const logDate = new Date(completedLogs[i].logDate);
-      logDate.setUTCHours(0, 0, 0, 0);
 
-      const expectedDate = new Date(lastCompletedDate);
-      expectedDate.setDate(expectedDate.getDate() - i);
+      expectedDate.setDate(expectedDate.getDate() - 1);
 
-      if (logDate.getTime() === expectedDate.getTime()) {
+      if (this.isSameDay(logDate, expectedDate)) {
         streak++;
       } else {
         break;
