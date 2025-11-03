@@ -9,6 +9,7 @@ import { Habit } from '../entities/habit.entity';
 import { CreateHabitDto } from './dto/create-habit.dto';
 import { LogHabitDto } from './dto/log-habit.dto';
 import { UpdateHabitDto } from './dto/update-habit.dto';
+import { PaginationDto } from './habits.controller';
 
 @Injectable()
 export class HabitsService {
@@ -24,25 +25,15 @@ export class HabitsService {
    * Esto evita problemas de zona horaria
    */
   private getDateString(date?: Date | string): string {
-    // Si ya es un string en formato YYYY-MM-DD, devolverlo directamente
-    if (typeof date === 'string') {
-      // Validar que tenga formato YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}/.test(date)) {
-        return date.substring(0, 10); // Tomar solo YYYY-MM-DD
-      }
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+      return date.substring(0, 10);
     }
 
-    // Si no hay fecha, usar hoy
-    let d: Date;
-    if (!date) {
-      d = new Date();
-    } else {
-      d = date instanceof Date ? date : new Date(date);
-    }
+    const d = date ? (date instanceof Date ? date : new Date(date)) : new Date();
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
@@ -64,11 +55,32 @@ export class HabitsService {
     return await this.habitRepository.save(habit);
   }
 
-  async findAll(userId: number) {
-    return await this.habitRepository.find({
+  async findAll(userId: number, pagination: PaginationDto) {
+    const defaultPage = 1;
+    const defaultLimit = 10;
+
+    // Coerce to numbers and provide sensible defaults if pagination or its fields are undefined
+    const page = Number(pagination?.page ?? defaultPage) || defaultPage;
+    const limit = Number(pagination?.limit ?? defaultLimit) || defaultLimit;
+
+    const skip = (Math.max(1, page) - 1) * limit;
+
+    const [habits, total] = await this.habitRepository.findAndCount({
       where: { user: { id: userId } },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return {
+      data: habits,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: number, userId: number) {

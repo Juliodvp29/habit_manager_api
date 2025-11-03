@@ -49,31 +49,31 @@ export class VerificationService {
   }
 
   // Crear o actualizar código de verificación
-  async createVerificationCode(
-    userId: number,
-    type: VerificationType,
-  ): Promise<string> {
-    const code = this.generateCode();
-    const expiresAt = this.getExpirationDate();
 
-    // 🔧 SOLUCIÓN: Eliminar códigos anteriores en lugar de actualizarlos
-    // Esto evita el conflicto con la restricción unique_active_code
-    await this.verificationCodeRepository.delete({
-      user: { id: userId },
-      type,
-      isUsed: false,
+  // ✅ MEJORAR: Usar transacción para evitar race conditions
+  async createVerificationCode(userId: number, type: VerificationType): Promise<string> {
+    return await this.verificationCodeRepository.manager.transaction(async manager => {
+      // Eliminar códigos anteriores
+      await manager.delete(VerificationCode, {
+        user: { id: userId },
+        type,
+        isUsed: false,
+      });
+
+      // Crear nuevo código
+      const code = this.generateCode();
+      const expiresAt = this.getExpirationDate();
+
+      const verificationCode = manager.create(VerificationCode, {
+        user: { id: userId },
+        code,
+        type,
+        expiresAt,
+      });
+
+      await manager.save(verificationCode);
+      return code;
     });
-
-    // Crear nuevo código
-    const verificationCode = this.verificationCodeRepository.create({
-      user: { id: userId },
-      code,
-      type,
-      expiresAt,
-    });
-
-    await this.verificationCodeRepository.save(verificationCode);
-    return code;
   }
 
   // Enviar código de verificación de email

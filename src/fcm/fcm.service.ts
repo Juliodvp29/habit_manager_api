@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as admin from 'firebase-admin';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DeviceToken, DeviceType } from '../entities/device-token.entity';
 import { Notification } from '../entities/notification.entity';
 
@@ -181,7 +181,7 @@ export class FcmService implements OnModuleInit {
 
       if (invalidTokens.length > 0) {
         await this.deviceTokenRepository.update(
-          { token: { $in: invalidTokens } as any },
+          { token: In(invalidTokens) },
           { isActive: false },
         );
       }

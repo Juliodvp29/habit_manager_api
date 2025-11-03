@@ -14,6 +14,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { VerificationModule } from './verification/verification.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -22,7 +23,10 @@ import { VerificationModule } from './verification/verification.module';
       envFilePath: '.env',
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule, ThrottlerModule.forRoot([{
+        ttl: 60000, // 1 minuto
+        limit: 10,  // 10 requests
+      }]),],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get('DB_HOST'),
