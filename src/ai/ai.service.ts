@@ -246,9 +246,9 @@ export class AiService {
     // Sugerencia basada en tasa de cumplimiento
     if (completionRate < 50) {
       suggestions.push(
-        `Tu tasa de cumplimiento es del ${completionRate}%. Considera reducir la frecuencia de "${habit.frequency}" a algo más manejable.`,
+        `Tu tasa de cumplimiento es del ${completionRate}%. Considera reducir la frecuencia de "${habit.frequency}" a algo más manejable o reducir la meta de ${habit.targetCount}.`,
       );
-    } else if (completionRate > 80) {
+    } else if (completionRate > 85) {
       suggestions.push(
         `¡Excelente! Mantienes un ${completionRate}% de cumplimiento. Podrías considerar aumentar el desafío.`,
       );
@@ -256,13 +256,28 @@ export class AiService {
 
     // Sugerencia basada en día de la semana
     const worstDays = Object.entries(dayPatterns)
-      .filter(([_, data]) => data.total > 0 && data.rate < 50)
+      .filter(([_, data]) => data.total > 0 && data.rate < 40)
       .map(([day, _]) => day);
 
     if (worstDays.length > 0) {
       suggestions.push(
         `Los ${worstDays.join(', ')} son tus días más difíciles. Intenta prepararte la noche anterior o ajusta tu horario.`,
       );
+    }
+
+    // Patrones específicos
+    const midWeek = ['Miércoles', 'Jueves'];
+    const midWeekRate = midWeek.reduce((acc, day) => acc + dayPatterns[day].rate, 0) / 2;
+    if (midWeekRate < 40 && completionRate > 50) {
+      suggestions.push('Parece que pierdes impulso a mitad de semana. ¡Intenta un recordatorio extra los miércoles!');
+    }
+
+    const weekend = ['Sábado', 'Domingo'];
+    const weekendRate = weekend.reduce((acc, day) => acc + dayPatterns[day].rate, 0) / 2;
+    const weekDayRate = (completionRate * 7 - weekendRate * 2) / 5; // Aprox
+
+    if (weekendRate > 80 && weekDayRate < 50) {
+      suggestions.push('Eres un "Guerrero de Fin de Semana". Intenta distribuir mejor tu esfuerzo durante la semana.');
     }
 
     // Sugerencia basada en tendencia
@@ -289,11 +304,13 @@ export class AiService {
       relations: ['preferredLanguage'],
     });
 
+    const habit = await this.habitRepository.findOne({ where: { id: habitId } });
     const analysisData = await this.analyzeHabitPattern(habitId, userId);
     const { analysis } = analysisData;
 
     const language = user?.preferredLanguage?.code || 'es';
-    const prompt = this.buildAIPrompt(analysisData, language);
+    // Pasamos el objeto habit completo para tener acceso a description, frequency, etc.
+    const prompt = this.buildAIPrompt({ ...analysisData, habit }, language);
 
     // Llamar a OpenAI
     const aiRecommendation = await this.callOpenAI(prompt);
@@ -314,15 +331,22 @@ export class AiService {
   }
 
   private buildAIPrompt(
-    data: { habitTitle: string; analysis: HabitAnalysis },
+    data: { habitTitle: string; analysis: HabitAnalysis; habit?: Habit | null },
     language: string,
   ): string {
     const lang = language === 'es' ? 'español' : 'English';
-    const { habitTitle, analysis } = data;
+    const { habitTitle, analysis, habit } = data;
+
+    const description = habit?.description ? `Descripción: "${habit.description}"` : '';
+    const frequency = habit?.frequency ? `Frecuencia: ${habit.frequency}` : '';
+    const target = habit?.targetCount ? `Meta: ${habit.targetCount}` : '';
 
     return `Eres un coach de hábitos experto. Analiza los siguientes datos y proporciona una recomendación personalizada, práctica y motivadora en ${lang}.
 
 **Hábito:** "${habitTitle}"
+${description}
+${frequency}
+${target}
 
 **Análisis de 30 días:**
 - Días completados: ${analysis.completedDays} de ${analysis.totalDays}
@@ -336,12 +360,12 @@ export class AiService {
 **Sugerencias detectadas:**
 ${analysis.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
-Proporciona una recomendación en 3-4 frases que incluya:
-1. Reconocimiento específico de sus patrones (menciona días, rachas, tendencias)
-2. UNA sugerencia práctica y específica para mejorar
-3. Motivación personalizada
+Proporciona una recomendación breve pero impactante que incluya:
+1. Una observación perspicaz sobre sus patrones (ej. "Veo que los miércoles te cuestan más...").
+2. Una pregunta reflexiva para el usuario.
+3. Un consejo de acción inmediata.
 
-Responde SOLO con la recomendación, sin saludos ni despedidas.`;
+Responde SOLO con la recomendación, usa un tono cercano y empático.`;
   }
 
   // ========================================
@@ -363,12 +387,19 @@ Responde SOLO con la recomendación, sin saludos ni despedidas.`;
     today.setHours(0, 0, 0, 0);
 
     const totalHabits = habits.length;
-    const completedToday = habits.filter((habit) =>
+    const completedHabitsList = habits.filter((habit) =>
       habit.logs.some(
         (log) =>
           log.logDate.getTime() === today.getTime() && log.completed,
       ),
-    ).length;
+    );
+    const completedToday = completedHabitsList.length;
+    const pendingHabitsList = habits.filter((habit) =>
+      !habit.logs.some(
+        (log) =>
+          log.logDate.getTime() === today.getTime() && log.completed,
+      ),
+    );
 
     // Calcular racha promedio
     let totalStreak = 0;
@@ -394,6 +425,8 @@ Responde SOLO con la recomendación, sin saludos ni despedidas.`;
       completedToday,
       avgStreak,
       language,
+      completedHabitsList.map(h => h.title),
+      pendingHabitsList.map(h => h.title)
     );
 
     const message = await this.callOpenAI(prompt);
@@ -413,23 +446,27 @@ Responde SOLO con la recomendación, sin saludos ni despedidas.`;
     completedToday: number,
     avgStreak: number,
     language: string,
+    completedNames: string[] = [],
+    pendingNames: string[] = []
   ): string {
     const lang = language === 'es' ? 'español' : 'English';
+    const pendingText = pendingNames.length > 0 ? `Pendientes: ${pendingNames.slice(0, 3).join(', ')}` : '';
+    const completedText = completedNames.length > 0 ? `Completados: ${completedNames.slice(0, 3).join(', ')}` : '';
 
     return `Eres un coach motivacional energético y empático. Genera un mensaje inspirador en ${lang} para una persona que:
 
 - Tiene ${totalHabits} hábitos activos
 - Ha completado ${completedToday} de ${totalHabits} hábitos hoy
 - Tiene una racha promedio de ${avgStreak} días
+- ${completedText}
+- ${pendingText}
 
 El mensaje debe:
 - Ser breve (2-3 frases máximo)
 - Incluir 1-2 emojis relevantes
-- Ser personalizado según sus números
-- Terminar con una llamada a la acción motivadora
-
-${completedToday === 0 ? 'La persona aún no ha completado nada hoy, motívala a empezar.' : ''}
-${completedToday === totalHabits ? '¡La persona completó TODO hoy! Celébralo con entusiasmo.' : ''}
+- Mencionar específicamente alguno de los hábitos pendientes para animar a completarlo (si hay).
+- Si ya completó todo, felicitar por los hábitos específicos logrados.
+- Terminar con una llamada a la acción motivadora.
 
 Responde SOLO con el mensaje motivacional, sin explicaciones.`;
   }
